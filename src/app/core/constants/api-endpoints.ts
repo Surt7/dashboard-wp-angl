@@ -11,6 +11,7 @@ export const API_ENDPOINTS = {
   },
   MACHINES: {
     ROOT: `${environment.bffBaseUrl}/api/v1/admin/machines`,
+    PAGED: `${environment.bffBaseUrl}/api/v1/admin/machines/paged`,
     BY_ID: (id: string) => `${environment.bffBaseUrl}/api/v1/admin/machines/${id}`,
     DASHBOARD: (id: string) => `${environment.bffBaseUrl}/api/v1/admin/machines/${id}/dashboard`,
     PROVISION: `${environment.bffBaseUrl}/api/v1/admin/machines/provision`,

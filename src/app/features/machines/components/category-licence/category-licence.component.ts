@@ -10,5 +10,9 @@ import { ModelSummary } from '../../models/machine.model';
   styleUrl: './category-licence.component.css',
 })
 export class CategoryLicenceComponent {
+  // Data input
   readonly modelSummaries = input.required<ModelSummary[]>();
+
+  // Search state input
+  readonly isSearching = input<boolean>(false);
 }

@@ -1,11 +1,23 @@
 <section class="flex flex-col gap-6">
 
-  <app-filter />
+  <app-filter
+    [viewMode]="viewMode()"
+    (viewModeChange)="onViewModeChange($event)"
+    [stats]="fleetStats()"
+    [availableLicenses]="availableLicenses()"
+    (search)="onSearch($event)"
+    (filtersChange)="onFiltersChange($event)"
+  />
 
   @if (viewMode() === 'LIST') {
 
-
-    <category-machine [machines]="machines()" />
+    <category-machine
+      [machines]="displayedMachines()"
+      [totalRecords]="totalRecords()"
+      [rows]="rows()"
+      [first]="first()"
+      (pageChange)="onPageChange($event)"
+    />
 
   } @else {
 
@@ -16,10 +28,19 @@
           déployées</p>
       </header>
 
-      <category-licence-card [modelSummaries]="modelSummaries()" />
+      <category-licence-card
+        [modelSummaries]="filteredModelSummaries()"
+        [isSearching]="!!searchQuery()"
+      />
     } @else {
 
       <machine-header [selectedModel]="selectedModel()!" />
+
+      <div class="flex items-center justify-between text-xs text-surface-500 dark:text-surface-400">
+        <span>
+          {{ selectedModelUnits().length }} {{ searchQuery() ? (selectedModelUnits().length > 1 ? 'bornes trouvées' : 'borne trouvée') : (selectedModelUnits().length > 1 ? 'bornes déployées' : 'borne déployée') }}
+        </span>
+      </div>
 
       <div class="flex flex-col gap-3">
         @for (unit of selectedModelUnits(); track unit.id) {
@@ -34,8 +55,6 @@
                 {{ unit.licenseName }} — Statut: {{ unit.status }}
               </p>
             </div>
-
-
           </div>
         }
       </div>
@@ -46,6 +65,5 @@
       />
     }
   }
-
 
 </section>

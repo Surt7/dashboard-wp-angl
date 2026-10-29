@@ -30,7 +30,7 @@ export default class AdminLayout {
     { icon: 'pi pi-server', label: 'Machines', route: '/machines' },
     { icon: 'pi pi-trophy', label: 'Leaderboard', route: '/leaderboard' },
     { icon: 'pi pi-users', label: 'Utilisateurs', route: '/users' },
-    { icon: 'pi pi-square', label: 'Diffusion', route: '/test-lobby' },
+    { icon: 'pi pi-desktop', label: 'Display Lobby', route: '/lobby-display' },
     { icon: 'pi pi-truck', label: 'Transports', route: '/transports' },
   ];
 }

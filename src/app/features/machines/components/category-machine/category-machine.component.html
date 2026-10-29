@@ -1,18 +1,15 @@
 <p-table
   [value]="machines()"
   [paginator]="true"
-  [rows]="10"
+  [rows]="rows()"
+  [totalRecords]="totalRecords()"
+  [first]="first()"
+  [lazy]="true"
   [rowsPerPageOptions]="[5, 10, 20]"
+  [showCurrentPageReport]="true"
+  currentPageReportTemplate="Affichage {first} à {last} sur {totalRecords} bornes"
+  (onPage)="onPage($event)"
   [tableStyle]="{ 'min-width': '50rem' }">
-  <ng-template #header>
-    <tr>
-      <th>Numéro de Série</th>
-      <th>Emplacement</th>
-      <th>Licence / Modèle</th>
-      <th>Statut</th>
-      <th>Dernier Ping</th>
-    </tr>
-  </ng-template>
   <ng-template #body let-machine>
     <tr>
       <td>

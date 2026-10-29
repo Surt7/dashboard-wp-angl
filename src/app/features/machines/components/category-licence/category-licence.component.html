@@ -12,27 +12,25 @@
         </div>
 
         <div class="flex items-center gap-3">
-              <span class="flex items-center gap-1.5 text-xs font-semibold text-surface-500 dark:text-surface-400">
-                <span class="w-1.5 h-1.5 rounded-full bg-lime-500 shadow-[0_0_4px_rgba(132,204,22,0.8)]"></span>
-                {{ item.onlineCount }}
-              </span>
+          <span class="flex items-center gap-1.5 text-xs font-semibold text-surface-500 dark:text-surface-400">
+            <span class="w-1.5 h-1.5 rounded-full bg-lime-500 shadow-[0_0_4px_rgba(132,204,22,0.8)]"></span>
+            {{ item.onlineCount }}
+          </span>
 
           @if (item.maintenanceCount > 0) {
             <span class="flex items-center gap-1.5 text-xs font-semibold text-amber-500 dark:text-amber-400"
                   title="En attente / maintenance">
-                  <span class="w-1.5 h-1.5 rounded-full bg-amber-500 shadow-[0_0_4px_rgba(245,158,11,0.8)]"></span>
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-500 shadow-[0_0_4px_rgba(245,158,11,0.8)]"></span>
               {{ item.maintenanceCount }}
-                </span>
+            </span>
           }
           <span
             class="px-2.5 py-1 rounded-lg bg-surface-100 dark:bg-surface-800 border border-surface-200 dark:border-primary-600 text-xs font-medium text-surface-700 dark:text-surface-300">
-                {{ item.totalUnits }} bornes
-              </span>
+            {{ item.totalUnits }} {{ isSearching() ? (item.totalUnits > 1 ? 'bornes trouvées' : 'borne trouvée') : (item.totalUnits > 1 ? 'bornes' : 'borne') }}
+          </span>
         </div>
       </div>
 
     </a>
-
   }
-
 </div>

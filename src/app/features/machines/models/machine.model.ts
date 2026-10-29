@@ -17,6 +17,26 @@ export interface Machine {
   lastPing?: string;
 }
 
+export interface FleetStats {
+  total: number;
+  online: number;
+  offline: number;
+  maintenance: number;
+  pending: number;
+}
+
+export interface PagedResponse<T> {
+  items: T[];
+  pageSize: number;
+  totalCount: number;
+  pageNumber: number;
+  totalPages?: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+  lastId: string | null;
+  stats?: FleetStats;
+}
+
 // Intellectual Property / Franchise License definition
 export interface PinballLicense {
   id: string;

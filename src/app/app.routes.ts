@@ -44,6 +44,11 @@ export const routes: Routes = [
           return LobbyDisplayComponent;
         },
       },
+      {
+        path: 'test-lobby',
+        redirectTo: 'lobby-display',
+        pathMatch: 'full',
+      },
     ],
   },
 ];

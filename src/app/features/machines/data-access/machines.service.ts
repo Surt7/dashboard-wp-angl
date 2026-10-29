@@ -7,8 +7,10 @@ import {
   LicenseSummary,
   ModelSummary,
   PinballModel,
+  PagedResponse,
+  FleetStats,
 } from '../models/machine.model';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { API_ENDPOINTS } from '../../../core/constants/api-endpoints';
 
@@ -20,9 +22,24 @@ export class MachineService {
   private readonly destroyRef = inject(DestroyRef);
 
   // Reactive state signals
-  #machines = signal<Machine[]>([]);
+  #allMachines = signal<Machine[]>([]);
+  #pagedMachines = signal<Machine[]>([]);
   #isLoading = signal<boolean>(false);
   #error = signal<string | null>(null);
+
+  // Hybrid pagination signals
+  #hasNextPage = signal<boolean>(false);
+  #hasPreviousPage = signal<boolean>(false);
+  #lastId = signal<string | null>(null);
+  #totalCount = signal<number>(0);
+  #pageNumber = signal<number>(1);
+  #fleetStats = signal<FleetStats>({
+    total: 0,
+    online: 0,
+    offline: 0,
+    maintenance: 0,
+    pending: 0,
+  });
 
   // Active view toggle: 'LIST' (flat table of all machines) or 'IP' (grouped by Intellectual Property / License)
   readonly viewMode = signal<'LIST' | 'IP'>('LIST');
@@ -30,23 +47,28 @@ export class MachineService {
   // Readonly public signals
   readonly isLoading = this.#isLoading.asReadonly();
   readonly error = this.#error.asReadonly();
-  readonly machines = this.#machines.asReadonly();
+  readonly machines = this.#pagedMachines.asReadonly();
+  readonly allMachines = this.#allMachines.asReadonly();
+  readonly hasNextPage = this.#hasNextPage.asReadonly();
+  readonly hasPreviousPage = this.#hasPreviousPage.asReadonly();
+  readonly lastId = this.#lastId.asReadonly();
+  readonly totalCount = this.#totalCount.asReadonly();
+  readonly pageNumber = this.#pageNumber.asReadonly();
+  readonly fleetStats = this.#fleetStats.asReadonly();
 
   // Backward compatibility alias for components using .units
-  readonly units = this.#machines.asReadonly();
+  readonly units = this.#allMachines.asReadonly();
 
   /**
-   * Computed signal grouping machines by their Intellectual Property (IP / Franchise License)
+   * Helper to build LicenseSummary[] from an arbitrary list of machines
    */
-  readonly licenseSummaries = computed<LicenseSummary[]>(() => {
-    const allMachines = this.#machines();
-    if (allMachines.length === 0) {
+  buildLicenseSummaries(machines: Machine[]): LicenseSummary[] {
+    if (machines.length === 0) {
       return [];
     }
 
-    // Group machines by licenseName / ipSlug
     const groups = new Map<string, Machine[]>();
-    for (const machine of allMachines) {
+    for (const machine of machines) {
       const key = machine.licenseName || 'Sans Licence';
       const existing = groups.get(key) ?? [];
       existing.push(machine);
@@ -71,19 +93,15 @@ export class MachineService {
     }
 
     return summaries;
+  }
+
+  /**
+   * Computed signal grouping full fleet by Intellectual Property (License)
+   */
+  readonly licenseSummaries = computed<LicenseSummary[]>(() => {
+    return this.buildLicenseSummaries(this.#allMachines());
   });
 
-  readonly fleetStats = computed(() => {
-    const all = this.#machines();
-
-    return {
-      total: all.length,
-      online: all.filter((m) => m.status === 'ONLINE').length,
-      offline: all.filter((m) => m.status === 'OFFLINE').length,
-      pending: all.filter((m) => m.status === 'PENDING').length,
-      maintenance: all.filter((m) => m.status === 'MAINTENANCE').length,
-    };
-  });
 
   // Backward-compatible computed signal for existing components
   readonly modelSummaries = computed<ModelSummary[]>(() => {
@@ -101,57 +119,105 @@ export class MachineService {
   readonly models = computed<PinballModel[]>(() => this.licenseSummaries());
 
   /**
-   * Loads machines from backend API and maps DTOs to UI domain entities
+   * Loads full fleet for global stats and license groups
    */
-  loadUnitsFormApi(): void {
-    this.#isLoading.set(true);
-    this.#error.set(null);
-
+  loadFleetOverview(): void {
     this.http
       .get<ApiMachineDto[]>(API_ENDPOINTS.MACHINES.ROOT, { withCredentials: true })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (dtos: ApiMachineDto[]) => {
-          const mappedMachines: Machine[] = dtos.map((dto) => {
-            const licenseName = dto.machineName || 'Resident Evil Death Island';
-            const ipSlug = licenseName
-              .toLowerCase()
-              .replace(/[^a-z0-9]+/g, '-')
-              .replace(/(^-|-$)/g, '');
-
-            return {
-              id: dto.machineId,
-              serialNumber: dto.serialNumber,
-              licenseName: licenseName,
-              ipSlug: ipSlug,
-              displayName: dto.displayName || dto.serialNumber,
-              status: mapStatusToUi(dto.machineStatus),
-              notes: dto.machineNotes,
-              registeredAtUtc: dto.registredAtUtc,
-              lastUpdated: dto.lastUpdated,
-              totalGamesPlayed: 0,
-              lastPing: 'Direct',
-            };
-          });
-
-          this.#machines.set(mappedMachines);
-          this.#isLoading.set(false);
+        next: (dtos) => {
+          this.#allMachines.set(dtos.map((dto) => this.mapDtoToMachine(dto)));
         },
-        error: (err) => {
-          console.error('API Error when loading machines:', err);
-          this.#error.set('Impossible de contacter le serveur backend');
-          this.#isLoading.set(false);
-        },
+        error: (err) => this.handleError(err, 'Failed to load fleet overview'),
+      });
+  }
+
+  /**
+   * Backward-compatible alias for loading all machines
+   */
+  loadUnitsFormApi(): void {
+    this.loadFleetOverview();
+  }
+  /**
+   * Loads machines using server-side hybrid keyset & offset pagination
+   */
+  loadPagedMachines(
+    pageSize: number = 10,
+    lastMachineId?: string | null,
+    pageNumber?: number | null,
+    search?: string,
+  ): void {
+    this.#isLoading.set(true);
+    this.#error.set(null);
+    let params = new HttpParams().set('pageSize', pageSize);
+    if (lastMachineId) params = params.set('lastMachineId', lastMachineId);
+    if (pageNumber && pageNumber > 1) params = params.set('page', pageNumber);
+    if (search && search.trim()) params = params.set('search', search.trim());
+    this.http
+      .get<PagedResponse<ApiMachineDto>>(API_ENDPOINTS.MACHINES.PAGED, {
+        params,
+        withCredentials: true,
+      })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (response) => this.handlePagedResponse(response),
+        error: (err) => this.handleError(err, 'Failed to load machines'),
       });
   }
 
   addUnit(newMachine: Machine): void {
-    this.#machines.update((currentList) => [...currentList, newMachine]);
+    this.#allMachines.update((currentList) => [newMachine, ...currentList]);
+    this.#pagedMachines.update((currentList) => [newMachine, ...currentList]);
   }
 
   updateUnitStatus(unitId: string, newStatus: MachineStatus): void {
-    this.#machines.update((currentList) =>
+    this.#allMachines.update((currentList) =>
       currentList.map((m) => (m.id === unitId ? { ...m, status: newStatus } : m)),
     );
+    this.#pagedMachines.update((currentList) =>
+      currentList.map((m) => (m.id === unitId ? { ...m, status: newStatus } : m)),
+    );
+  }
+
+  // --- Private Helpers ---
+
+  private mapDtoToMachine(dto: ApiMachineDto): Machine {
+    const licenseName = dto.machineName || 'Resident Evil Death Island';
+    const ipSlug = licenseName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+    return {
+      id: dto.machineId,
+      serialNumber: dto.serialNumber,
+      licenseName,
+      ipSlug,
+      displayName: dto.displayName || dto.serialNumber,
+      status: mapStatusToUi(dto.machineStatus),
+      notes: dto.machineNotes,
+      registeredAtUtc: dto.registredAtUtc,
+      lastUpdated: dto.lastUpdated,
+      totalGamesPlayed: 0,
+      lastPing: 'Direct',
+    };
+  }
+
+  private handlePagedResponse(response: PagedResponse<ApiMachineDto>): void {
+    const mapped = response.items.map((dto) => this.mapDtoToMachine(dto));
+    this.#pagedMachines.set(mapped);
+    this.#totalCount.set(response.totalCount);
+    this.#pageNumber.set(response.pageNumber);
+    this.#hasNextPage.set(response.hasNextPage);
+    this.#hasPreviousPage.set(response.hasPreviousPage);
+    this.#lastId.set(response.lastId);
+    if (response.stats) {
+      this.#fleetStats.set(response.stats);
+    }
+    this.#isLoading.set(false);
+  }
+
+  private handleError(err: unknown, userMessage: string): void {
+    console.error('[MachineService] API Error:', err);
+    this.#error.set(userMessage);
+    this.#isLoading.set(false);
   }
 }

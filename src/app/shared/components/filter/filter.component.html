@@ -3,12 +3,36 @@
 
   <!-- FILTER-->
   <app-fieldset-card title="Filtre">
-    <button
+    <div class="flex items-center gap-2">
+      <button
+        type="button"
+        (click)="openDrawer()"
+        class="flex-1 flex justify-center items-center gap-2 bg-primary-500 hover:bg-primary-400 text-white p-2.5 rounded-lg cursor-pointer transition-colors">
+        <i class="pi pi-filter"></i>
+        <span>Filtres avancés</span>
+        @if (hasActiveFilters()) {
+          <span class="px-1.5 py-0.5 text-[10px] font-bold bg-white text-primary-600 rounded-full ml-1">
+            {{ activeFilterCount() }}
+          </span>
+        }
+      </button>
 
-      class="w-full flex justify-center items-center gap-2 bg-primary-500 hover:bg-primary-400 text-white p-2.5 rounded-lg">
-      <i class="pi pi-filter"></i>
-      <span>Filtres avancés</span>
-    </button>
+      <!-- Bouton reset toujours présent : discret/grisé quand inactif, actif dès qu'un filtre est posé -->
+      <button
+        type="button"
+        [disabled]="!hasActiveFilters()"
+        (click)="resetFilters()"
+        [pTooltip]="hasActiveFilters() ? 'Réinitialiser tous les filtres' : 'Aucun filtre actif'"
+        tooltipPosition="top"
+        class="p-2.5 flex items-center justify-center rounded-lg border transition-all duration-200"
+        [class]="hasActiveFilters()
+          ? 'bg-surface-100 hover:bg-surface-200 dark:bg-surface-800 dark:hover:bg-surface-700 text-primary-500 border-primary-300 dark:border-primary-700 cursor-pointer shadow-xs'
+          : 'opacity-35 text-surface-400 dark:text-surface-600 border-surface-200 dark:border-surface-800 cursor-not-allowed bg-transparent'"
+        aria-label="Réinitialiser filtres">
+        <i class="pi pi-filter-slash text-sm"></i>
+      </button>
+    </div>
+
     <p-divider styleClass="!my-2" />
     <div class="segmented-toggle-track">
       <!-- List View Button -->
@@ -36,17 +60,32 @@
   <!-- RESEARCH -->
   <app-fieldset-card title="Rechercher">
     <div class="flex flex-col justify-center gap-3 h-full">
-      <input
-        type="text"
-        placeholder="Rechercher..."
-        class="w-full border border-surface-300
-        dark:border-surface-700
-        bg-surface-50 dark:bg-surface-900 rounded-lg
-         p-2 text-surface-900 dark:text-white"
-      />
+      <div class="relative w-full">
+        <input
+          #searchInput
+          type="text"
+          placeholder="Rechercher..."
+          maxlength="100"
+          (input)="onSearchInput($event)"
+          (keydown.enter)="onImmediateSearch(searchInput.value)"
+          class="w-full border border-surface-300 dark:border-surface-700 bg-surface-50 dark:bg-surface-900 rounded-lg p-2 pr-9 text-surface-900 dark:text-white transition-colors focus:outline-none focus:border-primary-500"
+        />
+        @if (searchQuery().length > 0) {
+          <button
+            type="button"
+            (click)="clearSearch(searchInput)"
+            class="absolute right-2 top-1/2 -translate-y-1/2 text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 cursor-pointer p-1 rounded-full transition-colors flex items-center justify-center"
+            aria-label="Effacer la recherche"
+            pTooltip="Effacer"
+            tooltipPosition="top">
+            <i class="pi pi-times text-xs"></i>
+          </button>
+        }
+      </div>
       <button
         pButton
         type="button"
+        (click)="onImmediateSearch(searchInput.value)"
         class="w-full flex justify-center items-center gap-2">
         <i class="pi pi-search mr-2"></i>
         Rechercher
@@ -72,12 +111,10 @@
         <span class="text-emerald-500">{{ stats().online }}</span>
       </div>
 
-
       <div class="flex justify-between items-center">
         <span class="text-surface-600 dark:text-surface-300">Offline</span>
         <span class="text-surface-400">{{ stats().offline }}</span>
       </div>
-
 
       <p-divider type="dashed" styleClass="!my-1.5 border-surface-200 dark:border-surface-800" />
 
@@ -91,3 +128,78 @@
   </app-fieldset-card>
 
 </div>
+
+<!-- PrimeNG Drawer : Panneau latéral des filtres avancés (Live Filtering) -->
+<p-drawer
+  [(visible)]="isDrawerOpen"
+  position="right"
+  header="Filtres Avancés"
+  [style]="{ width: '22rem' }">
+  
+  <div class="flex flex-col gap-6 py-4">
+    <!-- Statuts de la borne -->
+    <div>
+      <h4 class="text-sm font-semibold text-surface-900 dark:text-white mb-3">Statut de la borne</h4>
+      <div class="flex flex-col gap-2.5">
+        @for (item of availableStatuses; track item.value) {
+          <div class="flex items-center gap-2.5 cursor-pointer">
+            <p-checkbox
+              [value]="item.value"
+              [ngModel]="selectedStatuses()"
+              (ngModelChange)="onStatusChange($event)"
+              [inputId]="'status-' + item.value" />
+            <label [for]="'status-' + item.value" class="text-sm flex items-center gap-2 cursor-pointer text-surface-700 dark:text-surface-300">
+              <span class="w-2 h-2 rounded-full" [class]="item.dotClass"></span>
+              {{ item.label }}
+            </label>
+          </div>
+        }
+      </div>
+    </div>
+
+    <p-divider styleClass="!my-0" />
+
+    <!-- Licences / Modèles -->
+    @if (availableLicenses().length > 0) {
+      <div>
+        <h4 class="text-sm font-semibold text-surface-900 dark:text-white mb-3">Modèle / Licence</h4>
+        <div class="flex flex-wrap gap-2">
+          <button
+            type="button"
+            (click)="selectLicense(null)"
+            class="px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer"
+            [class]="selectedLicense() === null ? 'bg-primary-500 text-white border-primary-500' : 'bg-surface-100 dark:bg-surface-800 text-surface-700 dark:text-surface-300 border-surface-200 dark:border-surface-700'">
+            Toutes
+          </button>
+          @for (lic of availableLicenses(); track lic) {
+            <button
+              type="button"
+              (click)="selectLicense(lic)"
+              class="px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer"
+              [class]="selectedLicense() === lic ? 'bg-primary-500 text-white border-primary-500' : 'bg-surface-100 dark:bg-surface-800 text-surface-700 dark:text-surface-300 border-surface-200 dark:border-surface-700'">
+              {{ lic }}
+            </button>
+          }
+        </div>
+      </div>
+    }
+  </div>
+
+  <ng-template #footer>
+    <div class="flex items-center justify-between pt-3 border-t border-surface-200 dark:border-surface-800">
+      <span class="text-xs text-surface-500 dark:text-surface-400">
+        {{ hasActiveFilters() ? (activeFilterCount() > 1 ? activeFilterCount() + ' filtres actifs' : '1 filtre actif') : 'Aucun filtre actif' }}
+      </span>
+      <button
+        pButton
+        type="button"
+        severity="secondary"
+        [disabled]="!hasActiveFilters()"
+        (click)="resetFilters()"
+        class="text-xs">
+        <i class="pi pi-filter-slash mr-1 text-xs"></i>
+        Réinitialiser
+      </button>
+    </div>
+  </ng-template>
+</p-drawer>
