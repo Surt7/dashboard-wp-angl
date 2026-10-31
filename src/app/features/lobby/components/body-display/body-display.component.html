@@ -11,29 +11,7 @@
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       @for (lobby of lobbyService.adminLobbyList(); track lobby.sessionId) {
-        <div class="p-4 rounded-lg bg-surface-950 border border-surface-700 space-y-3">
-          <div class="flex justify-between items-center">
-            <span class="text-xs font-mono text-surface-400">Session : {{ lobby.sessionId.slice(0, 8) }}...</span>
-            <span
-              class="text-xs px-2 py-0.5 rounded bg-surface-800 text-emerald-400 font-mono font-bold">{{ lobby.sessionState }}</span>
-          </div>
-          <div class="grid grid-cols-4 gap-2">
-            @for (slot of lobby.slots; track slot.slotNumber) {
-              <div
-                class="text-center p-2 rounded border text-xs"
-                [class]="slot.isOccupied
-    ? 'border-emerald-500 bg-emerald-950/20'
-    : 'border-surface-800 bg-surface-900'"
-              >
-                <div class="text-surface-400 font-semibold">S{{ slot.slotNumber }}</div>
-                <div class="font-bold truncate mt-1" [class.text-emerald-400]="slot.isOccupied"
-                     [class.text-surface-600]="!slot.isOccupied">
-                  {{ slot.isOccupied ? (slot.guestInitials || slot.userId || 'Joueur') : 'Libre' }}
-                </div>
-              </div>
-            }
-          </div>
-        </div>
+        <app-game-session-card [lobby]="lobby" />
       } @empty {
         <div class="col-span-1 md:col-span-2 p-6 text-center text-surface-500 text-sm italic">
           En écoute du groupe AdminSupervision... Dès qu'une partie aura un événement, elle s'affichera ici

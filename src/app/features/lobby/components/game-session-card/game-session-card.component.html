@@ -1,0 +1,27 @@
+<div class="p-4 rounded-lg bg-surface-950 border border-solid space-y-3 transition-colors" [ngClass]="lobby().sessionState | sessionBorderColor">
+  <div class="flex justify-between items-center">
+    <span class="text-xs font-mono text-surface-400">
+      Session : {{ lobby().sessionId.slice(0, 8) }}...
+    </span>
+
+    <span
+      class="text-xs px-2 py-0.5 rounded border font-mono font-bold"
+      [class]="lobby().sessionState | sessionBadgeColor"
+    >
+      {{ lobby().sessionState }}
+    </span>
+  </div>
+  <div class="grid grid-cols-4 gap-2">
+    @for (slot of lobby().slots; track slot.slotNumber) {
+      <div
+        class="text-center p-2 rounded border text-xs transition-colors"
+        [ngClass]="slot | slotStatusClass: lobby().sessionState"
+      >
+        <div class="text-surface-400 font-semibold">S{{ slot.slotNumber }}</div>
+        <div class="font-bold truncate mt-1">
+          {{ slot | slotStatusLabel }}
+        </div>
+      </div>
+    }
+  </div>
+</div>
